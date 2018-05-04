@@ -7,17 +7,29 @@ This is a fairly simple trigger sequencer for Eurorack drums. It has an internal
 ## Materials
 
 6x illuminated arcade switches
+
 13x jacks, at least 1 of which must be switched
+
 1x Arduino Nano
+
 6x 10k resistor
+
 6x schottky diode
+
 1x potentiometer, 10k or so. Anything that keeps the current down is fine, but I ususally use 5-20k.
+
 4x 2.2k resistor
+
 1x 7805 regulator
+
 1x 2x5 header
+
 2x 100n capacitor
+
 3x ON-ON switch
+
 1x 5 position rotary switch
+
 Stripboard
 
 ## Schematic

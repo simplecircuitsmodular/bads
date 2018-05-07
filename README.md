@@ -55,6 +55,7 @@ BADS.ino. Written in Arduino 1.8.1.
 Changes:
 
 03MAY18 v0.0: First commit and working code. No comments, serial debugging stuff left in. Still rough, but funtional. There may be some unused variables.
+07MAY18: v0.0.1: Removed serial to allow D0 and D1 to be used as inputs. Added ability to clear all or clear individual channels by wiring a momentary toggle to D0, D1, and gnd. Switching to clear all immidiately clears all channels, switching to clear channel then triggering a channel clears that channel. Basic comments added.
 
 ## License
 CC BY-SA 4.0. See LICENSE.md for full text.

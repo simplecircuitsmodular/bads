@@ -3,47 +3,56 @@
  * CC BY-SA 4.0
  * 
  * 03MAY18 v0.0: First commit and working code. No comments, serial debugging stuff left in. Still rough, but funtional. There may be some unused variables.
+ * 07MAY18 v0.0.1: Still no commments and debugging hasn't been removed. Fixed RECORD switch, added clear switch.
  */
 
-#define CLK 2
 
-#define IN1 3
+
+#define TRIGGERTIME 50    //Sets length of trigger time
+
+#define CLK 2             //clock in; must be an interrupt
+
+#define IN1 3             //Inputs for arcade buttons and jacks
 #define IN2 4
 #define IN3 5
 #define IN4 6
 #define IN5 7
 #define IN6 8
 
-#define OUT1 9
+#define OUT1 9            //Outputs wired to jacks and button LED
 #define OUT2 10
 #define OUT3 11
 #define OUT4 12
 #define OUT5 13
 #define OUT6 A0
 
-#define CLK_POT A2 //ok
-#define MULT_SWT A1 //ok 14/15, 296/297, 545, 780/781, 1023 
-#define STEP_SWT A3 //ok
-#define CLK_OUT A4 //ok
-#define PLAY A5 //ok
-#define RECORD A6
+#define CLK_POT A2        //Analog pin to set internal clock time
+#define MULT_SWT A1       //Analog pin to read rotary switch
+#define STEP_SWT A3       //Choose between 3 and 4 steps. Used as digital pin
+#define CLK_OUT A4        //Output of clock, which is fed into CLK. Used as digital pin.
+#define PLAY A5           //Play pause switch. Used as digital pin.
+#define RECORD A6         //Record on/off. Used as analog pin becaouse A6 and A7 cannot be digital.
+#define CLEARCHAN 1       //Clear channel. Wired to momentary switch.
+#define CLEARALL 0        //clear all. Wired to momentart switch
 
-int triggers[6][64];
-int mult;
-int steps;
-int beat = 0;
-bool triggerState = false;
-bool play = true;
-bool record = false;
-float clkTime;
-bool clkState = true;
-unsigned long clkChange = false;
-unsigned long triggerOn;
-unsigned long triggerIndv[6] = {};
-float multRaw;
+int triggers[6][64];      //Array of 6 channels holding up to 64 beats
+int mult;                 //Multiplier set to 1, 2, 4, 8, or 16. Increaces steps from 3 or 4. Set by MULT_SWT
+int steps;                //Steps, 3 or 4. Set by STEP_SWT.
+int beat = 0;             //Increments with each intterupt to trigger the correct beat in triggers array
+bool triggerState = false; //flag used to turn off triggers after TRIGGERTIME ms
+bool play = true;         //play/pause flag
+bool record = false;      //record flag
+float clkTime;            //Time between clock on and off; set by CLK_POT
+bool clkState = true;     //flag to turn clock on and off
+unsigned long clkChange;  //Time clock last changed state
+unsigned long triggerOn;  //Time trigger turned on, used triggering all channels at once
+unsigned long triggerIndv[6] = {}; //time trigger turned on for individual channels, used when playing manually with buttons or external inout
+float multRaw;            //Raw data from MULT_SWT
+
+int clearState;           //flag for clearing channels
 
 void setup() {
-  pinMode(3, INPUT);
+  pinMode(3, INPUT);    //Set up input pins. Not pullups so they are active high, allowing external inputs to be used.
   pinMode(4, INPUT);
   pinMode(5, INPUT);
   pinMode(6, INPUT);
@@ -52,76 +61,95 @@ void setup() {
 
 
 
-  pinMode(9, OUTPUT);
+  pinMode(9, OUTPUT);   //Set up outputs for triggers and LEDs
   pinMode(10, OUTPUT);
   pinMode(11, OUTPUT);
   pinMode(12, OUTPUT);
   pinMode(13, OUTPUT);
   pinMode(A0, OUTPUT);
 
+  pinMode(CLEARCHAN, INPUT_PULLUP); //Set up other inputs. Clear inputs are pulled high, others are not because the switches are wired to ground. This should be changed if ON-OFF switches are used, and logic must be changed.
+  pinMode(CLEARALL, INPUT_PULLUP);
   pinMode(STEP_SWT, INPUT);
   pinMode(PLAY, INPUT);
-  pinMode(RECORD, INPUT);
-  pinMode(CLK, INPUT_PULLUP);
+  
+  pinMode(CLK, INPUT_PULLUP);   //Set up the clock input and outputs. 
   pinMode(CLK_OUT, OUTPUT);
-  Serial.begin(9600);
-  attachInterrupt(digitalPinToInterrupt(CLK), trigger, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(CLK), trigger, CHANGE); //Attach clock to hardware interrupt
 
 }
 
 void loop() {
+ clearState = digitalRead(CLEARCHAN);   //Get state of clear switch. This is done here rather than in the if statements so it only needs to be read once.
 
-  clkTime = analogRead(CLK_POT);
-  // Serial.println(clkTime);
-  if (clkState && (millis() - clkChange > clkTime)) {
+  if(digitalRead(CLEARALL) == LOW){     //If CLEARALL is active, clear all 6 channels
+    for (int i = 0; i < 6; i++){
+      clearChannel(i);
+    }
+  }
+  if (clearState == LOW && digitalRead(IN1) == HIGH){   //If CLEARCHAN is active, look for activation of a channel. Upon activation, clear that channel. This is done 6 times, once per channel.
+    clearChannel(0);
+  }
+    if (clearState == LOW && digitalRead(IN2) == HIGH){
+    clearChannel(1);
+  }
+    if (clearState == LOW && digitalRead(IN3) == HIGH){
+    clearChannel(2);
+  }
+    if (clearState == LOW && digitalRead(IN4) == HIGH){
+    clearChannel(3);
+  }
+    if (clearState == LOW && digitalRead(IN5) == HIGH){
+    clearChannel(4);
+  }
+    if (clearState == LOW && digitalRead(IN6) == HIGH){
+    clearChannel(5);
+  }
+
+  
+  clkTime = analogRead(CLK_POT);        //Get reading of CLK_POT to set clock time
+  if (clkState && (millis() - clkChange > clkTime)) { //Compare last change of CLK to current time and turn on.
     digitalWrite(CLK_OUT, HIGH);
-    Serial.println("Hi");
-    clkState = !clkState;
-    clkChange = millis();
+    clkState = !clkState;     //Change clock state
+    clkChange = millis();     //Update timer
   }
-  if (!clkState && millis() - clkChange > clkTime) {
+  if (!clkState && millis() - clkChange > clkTime) {  //Compare last change of CLK to current time and turn off.
     digitalWrite(CLK_OUT, LOW);
-    Serial.println("Lo");
-    clkState = !clkState;
-    clkChange = millis();
+    clkState = !clkState;   //Change clock state
+    clkChange = millis();   //Update timer
   }
 
-  multRaw = analogRead(MULT_SWT);
- // Serial.println(multRaw);
-  mult = scale(multRaw);
-  //Serial.println(multRaw);
-  if (digitalRead(STEP_SWT) == HIGH) {
+  multRaw = analogRead(MULT_SWT);   //Read rotart switch
+  mult = scale(multRaw);   //Pass raw reading from rotary switch to sclae function to set to 1, 2, 4, 8, or 16.
+
+
+  if (digitalRead(STEP_SWT) == HIGH) {   //Read position of STEP_SWT and set to 3 or 4
     steps = 4;
-    // Serial.println('4');
   }
   else {
     steps = 3;
-    // Serial.println('3');
   }
 
-  if (digitalRead(PLAY) == LOW) {
+  if (digitalRead(PLAY) == LOW) {     //Read position of PLAY switch and set flag to true or false
     play = false;
-    //  Serial.println("Pause");
   }
   else {
     play = true;
   }
 
-  if (digitalRead(RECORD) == LOW) {
+  if (analogRead(RECORD) > 500) {     //Read position of RECORD and set flag to true or false. Since A6 must be analog, analogRead(A6) > 500 is used rather than digitalRead(A6) == LOW.
     record = true;
-     Serial.println("LOW");
   }
   else {
     record = false;
-     Serial.println("HIGH");
   }
 
-  if (millis() - triggerOn < 20) {
+  if (millis() - triggerOn < TRIGGERTIME) {  //Turn off all channels after TRIGGERTIME ms
     triggerOff();
   }
+  
   if (digitalRead(IN1) == HIGH) {
     triggerIndv[0] = millis();
-    //Serial.println('1');
     digitalWrite(OUT1, HIGH);
     if (record) {
       triggers[0][beat] = 1;
@@ -163,16 +191,14 @@ void loop() {
     }
   }
   for (int i = 0; i < 6; i++) {
-    if (millis() - triggerIndv[i] < 20) {
+    if (millis() - triggerIndv[i] < TRIGGERTIME) {
       digitalWrite(i + 9, LOW);
     }
   }
 }
 
 void trigger() {
-  Serial.println("Trigger");
   if (play) {
-    //Serial.println("Play");
     for (int i = 0; i < 6; i++) {
       if (triggers[i][beat] == 1) {
         digitalWrite(i + 9, HIGH);
@@ -185,7 +211,6 @@ void trigger() {
   if (beat >= (mult * steps)) {
     beat = 0;
   }
- // Serial.println(beat);
 }
 
 void triggerOff() {
@@ -204,5 +229,11 @@ int scale(int multRaw) {
     return 8;
   if (multRaw < 1024)
     return 16;
+}
+
+void clearChannel(int toClear){
+  for(int i = 0; i < 64; i++){
+    triggers[toClear][i] = 0;
+  }
 }
 

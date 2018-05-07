@@ -45,6 +45,7 @@ In short:
 7. Wire the 2k2 resistors between lugs on the rotary switch, then wire 1 end to +5 and 1 to gnd. The common pin goes to A2. 
 8. A3, A5, and A6 go to the common pin on the toggle switches. The other pins go to +5 and gnd. 
 9. A4 goes to the switched lug of your jack. The unswitched side goes to D2, and wire the sleeve to gnd. 
+9. Wire a momentary switch to ground and D1 and to ground and D0. An (ON)-(ON) toggle can be used by wiring 1 outside pin to D1, the other outside pin to D0, and the middle pin to ground. 
 
 You can change any of these pins as long as you change them in the code, but the clock needs to be on an interrupt.
 

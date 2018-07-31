@@ -8,7 +8,8 @@
 
 
 
-#define TRIGGERTIME 50    //Sets length of trigger time
+#define TRIGGERTIME 20    //Sets length of trigger time
+#define DEBOUNCE 250
 
 #define CLK 2             //clock in; must be an interrupt
 
@@ -80,6 +81,7 @@ void setup() {
 }
 
 void loop() {
+
  clearState = digitalRead(CLEARCHAN);   //Get state of clear switch. This is done here rather than in the if statements so it only needs to be read once.
 
   if(digitalRead(CLEARALL) == LOW){     //If CLEARALL is active, clear all 6 channels
@@ -144,46 +146,46 @@ void loop() {
     record = false;
   }
 
-  if (millis() - triggerOn < TRIGGERTIME) {  //Turn off all channels after TRIGGERTIME ms
+  if (millis() - triggerOn > TRIGGERTIME) {  //Turn off all channels after TRIGGERTIME ms
     triggerOff();
   }
   
-  if (digitalRead(IN1) == HIGH) {
+  if (digitalRead(IN1) == HIGH && millis() - triggerIndv[0] > DEBOUNCE) {
     triggerIndv[0] = millis();
     digitalWrite(OUT1, HIGH);
     if (record) {
       triggers[0][beat] = 1;
     }
   }
-  if (digitalRead(IN2) == HIGH) {
+  if (digitalRead(IN2) == HIGH && millis() - triggerIndv[1] > DEBOUNCE) {
     triggerIndv[1] = millis();
     digitalWrite(OUT2, HIGH);
     if (record) {
       triggers[1][beat] = 1;
     }
   }
-  if (digitalRead(IN3) == HIGH) {
+  if (digitalRead(IN3) == HIGH && millis() - triggerIndv[2] > DEBOUNCE) {
     triggerIndv[2] = millis();
     digitalWrite(OUT3, HIGH);
     if (record) {
       triggers[2][beat] = 1;
     }
   }
-  if (digitalRead(IN4) == HIGH) {
+  if (digitalRead(IN4) == HIGH && millis() - triggerIndv[3] > DEBOUNCE) {
     triggerIndv[3] = millis();
     digitalWrite(OUT4, HIGH);
     if (record) {
       triggers[3][beat] = 1;
     }
   }
-  if (digitalRead(IN5) == HIGH) {
+  if (digitalRead(IN5) == HIGH && millis() - triggerIndv[4] > DEBOUNCE) {
     triggerIndv[4] = millis();
     digitalWrite(OUT5, HIGH);
     if (record) {
       triggers[4][beat] = 1;
     }
   }
-  if (digitalRead(IN6) == HIGH) {
+  if (digitalRead(IN6) == HIGH && millis() - triggerIndv[5] > DEBOUNCE) {
     triggerIndv[5] = millis();
     digitalWrite(OUT6, HIGH);
     if (record) {
@@ -204,13 +206,14 @@ void trigger() {
         digitalWrite(i + 9, HIGH);
       }
       triggerState = true;
-      triggerOn = millis();
     }
     beat++;
   }
   if (beat >= (mult * steps)) {
     beat = 0;
   }
+  
+      triggerOn = millis();
 }
 
 void triggerOff() {
@@ -236,4 +239,3 @@ void clearChannel(int toClear){
     triggers[toClear][i] = 0;
   }
 }
-

@@ -19,10 +19,10 @@ This is the panel in Adobe Illustrator format. This can be used to manufacture a
 
 ## Updates
 
-07MAY18 0.1.1
+### 01.1 07MAY18
 
 Removed serial to allow D0 and D1 to be used as inputs. Added ability to clear all or clear individual channels by wiring a momentary toggle to D0, D1, and gnd. Switching to clear all immidiately clears all channels, switching to clear channel then triggering a channel clears that channel. Basic comments added.
 
-03MAY18 0.1
+### 01 03MAY18
 
 First commit and working code. No comments, serial debugging stuff left in. Still rough, but funtional. There may be some unused variables.

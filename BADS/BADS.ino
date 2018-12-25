@@ -1,13 +1,3 @@
-/*Written by Nick Biederman
- * See github.com/biednick/bads
- * CC BY-SA 4.0
- * 
- * 03MAY18 v0.0: First commit and working code. No comments, serial debugging stuff left in. Still rough, but funtional. There may be some unused variables.
- * 07MAY18 v0.0.1: Still no commments and debugging hasn't been removed. Fixed RECORD switch, added clear switch.
- */
-
-
-
 #define TRIGGERTIME 20    //Sets length of trigger time
 #define DEBOUNCE 250
 
@@ -33,8 +23,9 @@
 #define CLK_OUT A4        //Output of clock, which is fed into CLK. Used as digital pin.
 #define PLAY A5           //Play pause switch. Used as digital pin.
 #define RECORD A6         //Record on/off. Used as analog pin becaouse A6 and A7 cannot be digital.
+#define STEP_SWT A7       //Manually step
 #define CLEARCHAN 1       //Clear channel. Wired to momentary switch.
-#define CLEARALL 0        //clear all. Wired to momentart switch
+#define CLEARALL 0        //clear all. Wired to momentary switch
 
 int triggers[6][64];      //Array of 6 channels holding up to 64 beats
 int mult;                 //Multiplier set to 1, 2, 4, 8, or 16. Increaces steps from 3 or 4. Set by MULT_SWT
@@ -49,7 +40,6 @@ unsigned long clkChange;  //Time clock last changed state
 unsigned long triggerOn;  //Time trigger turned on, used triggering all channels at once
 unsigned long triggerIndv[6] = {}; //time trigger turned on for individual channels, used when playing manually with buttons or external inout
 float multRaw;            //Raw data from MULT_SWT
-
 int clearState;           //flag for clearing channels
 
 void setup() {
@@ -69,46 +59,46 @@ void setup() {
   pinMode(13, OUTPUT);
   pinMode(A0, OUTPUT);
 
-  pinMode(CLEARCHAN, INPUT_PULLUP); //Set up other inputs. Clear inputs are pulled high, others are not because the switches are wired to ground. This should be changed if ON-OFF switches are used, and logic must be changed.
+  pinMode(CLEARCHAN, INPUT_PULLUP); //Set up other inputs. Clear inputs are pulled high, others are not because the switches are wired to ground. This should be changed if ON-OFF switches are used, and logic must be inverted.
   pinMode(CLEARALL, INPUT_PULLUP);
   pinMode(STEP_SWT, INPUT);
   pinMode(PLAY, INPUT);
-  
-  pinMode(CLK, INPUT_PULLUP);   //Set up the clock input and outputs. 
+
+  pinMode(CLK, INPUT_PULLUP);   //Set up the clock input and outputs.
   pinMode(CLK_OUT, OUTPUT);
-  attachInterrupt(digitalPinToInterrupt(CLK), trigger, CHANGE); //Attach clock to hardware interrupt
+  attachInterrupt(digitalPinToInterrupt(CLK), interruptDriver, CHANGE); //Attach clock to hardware interrupt
 
 }
 
 void loop() {
 
- clearState = digitalRead(CLEARCHAN);   //Get state of clear switch. This is done here rather than in the if statements so it only needs to be read once.
+  clearState = digitalRead(CLEARCHAN);   //Get state of clear switch. This is done here rather than in the if statements so it only needs to be read once.
 
-  if(digitalRead(CLEARALL) == LOW){     //If CLEARALL is active, clear all 6 channels
-    for (int i = 0; i < 6; i++){
+  if (digitalRead(CLEARALL) == LOW) {   //If CLEARALL is active, clear all 6 channels
+    for (int i = 0; i < 6; i++) {
       clearChannel(i);
     }
   }
-  if (clearState == LOW && digitalRead(IN1) == HIGH){   //If CLEARCHAN is active, look for activation of a channel. Upon activation, clear that channel. This is done 6 times, once per channel.
+  if (clearState == LOW && digitalRead(IN1) == HIGH) {  //If CLEARCHAN is active, look for activation of a channel. Upon activation, clear that channel. This is done 6 times, once per channel.
     clearChannel(0);
   }
-    if (clearState == LOW && digitalRead(IN2) == HIGH){
+  if (clearState == LOW && digitalRead(IN2) == HIGH) {
     clearChannel(1);
   }
-    if (clearState == LOW && digitalRead(IN3) == HIGH){
+  if (clearState == LOW && digitalRead(IN3) == HIGH) {
     clearChannel(2);
   }
-    if (clearState == LOW && digitalRead(IN4) == HIGH){
+  if (clearState == LOW && digitalRead(IN4) == HIGH) {
     clearChannel(3);
   }
-    if (clearState == LOW && digitalRead(IN5) == HIGH){
+  if (clearState == LOW && digitalRead(IN5) == HIGH) {
     clearChannel(4);
   }
-    if (clearState == LOW && digitalRead(IN6) == HIGH){
+  if (clearState == LOW && digitalRead(IN6) == HIGH) {
     clearChannel(5);
   }
 
-  
+
   clkTime = analogRead(CLK_POT);        //Get reading of CLK_POT to set clock time
   if (clkState && (millis() - clkChange > clkTime)) { //Compare last change of CLK to current time and turn on.
     digitalWrite(CLK_OUT, HIGH);
@@ -149,7 +139,21 @@ void loop() {
   if (millis() - triggerOn > TRIGGERTIME) {  //Turn off all channels after TRIGGERTIME ms
     triggerOff();
   }
-  
+
+  if (analogRead(STEP_SWT) < 250) {
+    trigger(false);
+  }
+
+  readButtons();
+
+  for (int i = 0; i < 6; i++) {
+    if (millis() - triggerIndv[i] < TRIGGERTIME) {
+      digitalWrite(i + 9, LOW);
+    }
+  }
+}
+
+void readButtons() {
   if (digitalRead(IN1) == HIGH && millis() - triggerIndv[0] > DEBOUNCE) {
     triggerIndv[0] = millis();
     digitalWrite(OUT1, HIGH);
@@ -192,28 +196,29 @@ void loop() {
       triggers[5][beat] = 1;
     }
   }
-  for (int i = 0; i < 6; i++) {
-    if (millis() - triggerIndv[i] < TRIGGERTIME) {
-      digitalWrite(i + 9, LOW);
-    }
-  }
 }
 
-void trigger() {
-  if (play) {
-    for (int i = 0; i < 6; i++) {
-      if (triggers[i][beat] == 1) {
-        digitalWrite(i + 9, HIGH);
-      }
-      triggerState = true;
-    }
-    beat++;
+void interruptDriver() {
+  trigger(true);
+}
+
+void trigger(bool interruptCall) {
+  if (!play && interruptCall) {
+    return;
   }
+  for (int i = 0; i < 6; i++) {
+    if (triggers[i][beat] == 1) {
+      digitalWrite(i + 9, HIGH);
+    }
+    triggerState = true;
+  }
+  beat++;
+
   if (beat >= (mult * steps)) {
     beat = 0;
   }
-  
-      triggerOn = millis();
+
+  triggerOn = millis();
 }
 
 void triggerOff() {
@@ -234,8 +239,8 @@ int scale(int multRaw) {
     return 16;
 }
 
-void clearChannel(int toClear){
-  for(int i = 0; i < 64; i++){
+void clearChannel(int toClear) {
+  for (int i = 0; i < 64; i++) {
     triggers[toClear][i] = 0;
   }
 }
